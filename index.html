@@ -179,7 +179,7 @@ function minSpeed(slope){
 // ---------- state ----------
 const $=id=>document.getElementById(id);
 const cv=$('cv'),ctx=cv.getContext('2d');
-let slope=2.25,rate=0.25,kmh=2130,run=null,playT=0,playing=false,last=0,col={},view=null;
+let slope=2.25,rate=0.25,kmh=2130,run=null,playT=0,playing=false,last=null,loop=0,col={},view=null;
 const mins={};
 function tokens(){const cs=getComputedStyle(document.documentElement);
   for(const n of['sky-top','sky-bot','ground','ground-edge','water','tree','house','roof','glass','trail','path','fg','muted','line','accent','bad','good','panel'])col[n]=cs.getPropertyValue('--'+n).trim()}
@@ -255,7 +255,7 @@ function draw(){
   for(let i=0;i<S.length;i+=10){const p=[px(S[i].x),py(S[i].y)];i?ctx.lineTo(...p):ctx.moveTo(...p)}
   ctx.stroke();ctx.setLineDash([]);
   // trail
-  const cur=Math.min(S.length-1,Math.floor(playT/0.002));
+  const cur=Math.max(0,Math.min(S.length-1,Math.floor(playT/0.002)));
   ctx.strokeStyle=col.trail;ctx.lineWidth=2.5;ctx.beginPath();
   for(let i=0;i<=cur;i+=4){const p=[px(S[i].x),py(S[i].y)];i?ctx.lineTo(...p):ctx.moveTo(...p)}
   ctx.stroke();
@@ -287,7 +287,7 @@ function drawEnd(x,y){
 const OUT={splash:['Splash: lands in the Emajõgi','bad'],tree:['Crashes into trees','bad'],house:['Crashes into a house','bad'],
   ground:['Hits the ground before the river','bad'],far:['Cleared: lands on the far bank','good'],away:['Cleared: still flying when it leaves the frame','good']};
 function hud(){
-  const S=run.S,cur=Math.min(S.length-1,Math.floor(playT/0.002)),st=S[cur],done=playT>=endT();
+  const S=run.S,cur=Math.max(0,Math.min(S.length-1,Math.floor(playT/0.002))),st=S[cur],done=playT>=endT();
   const m=st.s/A_SND,g=st.x>=NEAR&&st.x<=FAR?WATER:ground(st.x);
   $('r-spd').innerHTML=fmt(st.s*3.6)+'<small>km/h</small>';$('r-ms').textContent=fmt(st.s)+' m/s';
   $('r-mach').textContent=m.toFixed(2);$('r-mach-s').textContent=m>=1.2?'supersonic':m>=.8?'transonic':'subsonic';
@@ -301,13 +301,14 @@ function hud(){
   if(done){const[o,k]=OUT[run.out.k];s.textContent=o+' at '+fmt(run.out.x)+' m · '+fmt(run.out.speed*3.6)+' km/h';s.dataset.k=k}
   else if(playing){s.textContent=st.air?(m>=1?'Airborne · supersonic':'Airborne'):'Driving up the roof';s.dataset.k=st.air?'warn':''}
 }
-function frame(ts){
-  if(!playing)return;
-  const dtw=Math.min(.05,(ts-last)/1000);last=ts;playT+=dtw*rate;
+function frame(ts,id){
+  if(!playing||id!==loop)return;
+  if(last===null)last=ts;
+  const dtw=Math.max(0,Math.min(.05,(ts-last)/1000));last=ts;playT+=dtw*rate;
   if(playT>=endT()){playT=endT();playing=false}
-  draw();hud();if(playing)requestAnimationFrame(frame);
+  draw();hud();if(playing)requestAnimationFrame(t=>frame(t,id));
 }
-function launch(){prepare();layout();playing=true;last=performance.now();playT=0;requestAnimationFrame(frame)}
+function launch(){prepare();layout();playing=true;last=null;playT=0;const id=++loop;requestAnimationFrame(t=>frame(t,id))}
 function still(){prepare();layout();playT=endT();draw();hud()}
 
 // ---------- controls ----------
